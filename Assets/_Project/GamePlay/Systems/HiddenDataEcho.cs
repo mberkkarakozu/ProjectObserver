@@ -1,7 +1,7 @@
 using UnityEngine;
 using System.Collections;
-
-public class HiddenDataEcho : MonoBehaviour
+using GamePlay.Systems; 
+public class HiddenDataEcho : MonoBehaviour, IScannable
 {
     [SerializeField] private float visibleDuration = 3f;
 
@@ -15,24 +15,30 @@ public class HiddenDataEcho : MonoBehaviour
 
     private void Start()
     {
-        _meshRenderer.enabled = false;
+        if (_meshRenderer) _meshRenderer.enabled = false;
+    }
+
+    public void OnScanHit()
+    {
+        Reveal();
+    }
+
+    public ScanVisualData GetScanData()
+    {
+        return new ScanVisualData(Color.cyan, 1f);
     }
 
     public void Reveal()
     {
-        if (_hideTimerRoutine != null)
-        {
-            StopCoroutine(_hideTimerRoutine);
-        }
-
-        _meshRenderer.enabled = true;
+        if (_hideTimerRoutine != null) StopCoroutine(_hideTimerRoutine);
+        if (_meshRenderer) _meshRenderer.enabled = true;
         _hideTimerRoutine = StartCoroutine(HideRoutine());
     }
 
     private IEnumerator HideRoutine()
     {
         yield return new WaitForSeconds(visibleDuration);
-        _meshRenderer.enabled = false;
+        if (_meshRenderer) _meshRenderer.enabled = false;
         _hideTimerRoutine = null;
     }
 }

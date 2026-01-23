@@ -1,61 +1,84 @@
 using UnityEngine;
 using System;
 using System.Collections;
+using System.Collections.Generic;
 
-public class LidarScanner : MonoBehaviour
+namespace GamePlay.Systems
 {
-    [SerializeField] private float maxScanRadius = 10f;
-    [SerializeField] private float scanSpeed = 5f;
-    [SerializeField] private LayerMask scanLayer;
-
-    public event Action<float> OnScanStarted;
-    public event Action OnScanCompleted;
-
-    private bool _isScanning;
-
-    private void Update()
+    public class LidarScanner : MonoBehaviour
     {
-        if (Input.GetKeyDown(KeyCode.Space))
+        [Header("Scanner Ayarlarý")]
+        [SerializeField] private float maxScanRadius = 20f;
+        [SerializeField] private float scanSpeed = 15f;
+        [SerializeField] private LayerMask scanLayer;
+
+        [Header("Görsel Efekt")]
+        [SerializeField] private ParticleSystem scanParticle; // Buraya Efekti Sürükle!
+
+        public event Action<float> OnScanStarted;
+        public event Action OnScanCompleted;
+
+        private bool _isScanning;
+        private HashSet<int> _scannedObjects = new HashSet<int>();
+
+        private void Update()
         {
-            Scan();
+            if (Input.GetKeyDown(KeyCode.Space)) Scan();
         }
-    }
 
-    public void Scan()
-    {
-        if (!_isScanning && scanSpeed > 0)
+        public void Scan()
         {
-            StartCoroutine(PerformScanRoutine());
+            if (!_isScanning) StartCoroutine(PerformScanRoutine());
         }
-    }
 
-    private IEnumerator PerformScanRoutine()
-    {
-        _isScanning = true;
-        float currentRadius = 0f;
-        float duration = maxScanRadius / scanSpeed;
-
-        OnScanStarted?.Invoke(duration);
-
-        while (currentRadius < maxScanRadius)
+        private IEnumerator PerformScanRoutine()
         {
-            currentRadius += scanSpeed * Time.deltaTime;
+            _isScanning = true;
+            _scannedObjects.Clear();
 
-            Collider[] hits = Physics.OverlapSphere(transform.position, currentRadius, scanLayer);
+            float currentRadius = 0f;
+            float duration = maxScanRadius / scanSpeed;
 
-            foreach (Collider hit in hits)
+            OnScanStarted?.Invoke(duration);
+
+            if (scanParticle != null)
             {
-                HiddenDataEcho hiddenObject = hit.GetComponent<HiddenDataEcho>();
-                if (hiddenObject != null)
-                {
-                    hiddenObject.Reveal();
-                }
+                scanParticle.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                var main = scanParticle.main;
+                main.duration = duration;
+                main.startLifetime = duration;
+                main.startSize = maxScanRadius * 2.5f; 
+                scanParticle.Play();
             }
 
-            yield return null;
-        }
+            while (currentRadius < maxScanRadius)
+            {
+                currentRadius += scanSpeed * Time.deltaTime;
 
-        OnScanCompleted?.Invoke();
-        _isScanning = false;
+                Collider[] hits = Physics.OverlapSphere(transform.position, currentRadius, scanLayer);
+                foreach (Collider hit in hits)
+                {
+                    int id = hit.GetInstanceID();
+                    if (_scannedObjects.Contains(id)) continue;
+
+                    float dist = Vector3.Distance(transform.position, hit.transform.position);
+                    if (dist > currentRadius) continue;
+
+                    if (hit.TryGetComponent(out IScannable scannable))
+                    {
+                        scannable.OnScanHit();
+                        _scannedObjects.Add(id);
+                    }
+                    else if (hit.TryGetComponent(out HiddenDataEcho hidden))
+                    {
+                        hidden.Reveal();
+                        _scannedObjects.Add(id);
+                    }
+                }
+                yield return null;
+            }
+            OnScanCompleted?.Invoke();
+            _isScanning = false;
+        }
     }
 }
