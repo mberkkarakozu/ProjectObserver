@@ -1,4 +1,5 @@
 RESET. Tüm önceki konuşmaları ve varsayımları unut.
+Buradan sonra her yazdığına kaçıncı mesaj olduğunu yaz. (Bu 1. mesaj)
 
 Sadece ai-context klasöründeki dosyaları (GAME_DESIGN, TECH_STACK, CURRENT_STATE) "Tek Gerçek Kaynak" (Single Source of Truth) olarak kabul et.
 
