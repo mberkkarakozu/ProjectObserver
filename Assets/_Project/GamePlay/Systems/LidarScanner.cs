@@ -1,4 +1,4 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -7,13 +7,15 @@ namespace GamePlay.Systems
 {
     public class LidarScanner : MonoBehaviour
     {
-        [Header("Scanner Ayarlarý")]
+        [Header("Scanner Settings")]
         [SerializeField] private float maxScanRadius = 20f;
         [SerializeField] private float scanSpeed = 15f;
         [SerializeField] private LayerMask scanLayer;
 
-        [Header("Görsel Efekt")]
-        [SerializeField] private ParticleSystem scanParticle; // Buraya Efekti Sürükle!
+        [Header("Visual Settings")]
+        [SerializeField] private ParticleSystem scanParticle;
+        [Tooltip("Effect Transform")]
+        [SerializeField] private Transform handTransform; 
 
         public event Action<float> OnScanStarted;
         public event Action OnScanCompleted;
@@ -36,6 +38,8 @@ namespace GamePlay.Systems
             _isScanning = true;
             _scannedObjects.Clear();
 
+            Vector3 originPoint = handTransform != null ? handTransform.position : transform.position;
+
             float currentRadius = 0f;
             float duration = maxScanRadius / scanSpeed;
 
@@ -43,11 +47,14 @@ namespace GamePlay.Systems
 
             if (scanParticle != null)
             {
+                scanParticle.transform.position = originPoint;
+
                 scanParticle.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
                 var main = scanParticle.main;
                 main.duration = duration;
                 main.startLifetime = duration;
-                main.startSize = maxScanRadius * 2.5f; 
+
+
                 scanParticle.Play();
             }
 
@@ -55,13 +62,14 @@ namespace GamePlay.Systems
             {
                 currentRadius += scanSpeed * Time.deltaTime;
 
-                Collider[] hits = Physics.OverlapSphere(transform.position, currentRadius, scanLayer);
+                Collider[] hits = Physics.OverlapSphere(originPoint, currentRadius, scanLayer);
+
                 foreach (Collider hit in hits)
                 {
                     int id = hit.GetInstanceID();
                     if (_scannedObjects.Contains(id)) continue;
 
-                    float dist = Vector3.Distance(transform.position, hit.transform.position);
+                    float dist = Vector3.Distance(originPoint, hit.transform.position);
                     if (dist > currentRadius) continue;
 
                     if (hit.TryGetComponent(out IScannable scannable))
@@ -69,14 +77,11 @@ namespace GamePlay.Systems
                         scannable.OnScanHit();
                         _scannedObjects.Add(id);
                     }
-                    else if (hit.TryGetComponent(out HiddenDataEcho hidden))
-                    {
-                        hidden.Reveal();
-                        _scannedObjects.Add(id);
-                    }
                 }
+
                 yield return null;
             }
+
             OnScanCompleted?.Invoke();
             _isScanning = false;
         }
